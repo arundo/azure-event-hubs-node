@@ -2,13 +2,15 @@ language: node_js
 
 node_js:
   - "8"
- 
-  before_install:
+
+cache:
+  directories:
+    - node_modules
+
+before_install:
   - cd client
 
-  script:
-  - npm test
-  - cd ../processor
+script:
   - npm test
 
 deploy:
