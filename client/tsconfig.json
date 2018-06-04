@@ -12,6 +12,7 @@
     "noUnusedLocals":true,
     "strict": true,
     "strictPropertyInitialization": true,
+    "strictNullChecks": true,
     "declaration": true,
     "declarationDir": "./typings/lib",
     "lib": [

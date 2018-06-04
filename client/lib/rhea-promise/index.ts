@@ -45,11 +45,9 @@ export function connect(options?: rhea.ConnectionOptions): Promise<rhea.Connecti
       reject(context.connection.error);
     }
 
-    function onTransportClose(context: Context): void {
+    function onTransportClose(context: rhea.EventContext): void {
         debug(`Error occurred after establishing amqp connection.`, context.connection.error);
-      closeConnection(context.connection).then(() => {
-        context.connection = undefined;
-      }).catch((err) => {
+      closeConnection(context.connection).catch((err) => {
         debug(`Error occurred while closing amqp connection.`, err);
       });
     }
