@@ -184,7 +184,6 @@ export class EventHubSender extends ClientEntity {
         let onModified: Func<rheaPromise.Context, void>;
         let onAccepted: Func<rheaPromise.Context, void>;
         const removeListeners = (): void => {
-          debug("**********[%s] Sender '%s', removing listeners", this._context.connectionId, this.name);
           this._sender.removeAllListeners("rejected");
           this._sender.removeAllListeners("accepted");
           this._sender.removeAllListeners("released");
@@ -228,7 +227,6 @@ export class EventHubSender extends ClientEntity {
           }
           reject(err);
         };
-        debug("**********[%s] Sender '%s', adding listeners", this._context.connectionId, this.name);
         this._sender.on("accepted", onAccepted);
         this._sender.on("rejected", onRejected);
         this._sender.on("modified", onModified);
