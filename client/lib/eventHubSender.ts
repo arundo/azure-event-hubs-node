@@ -184,10 +184,11 @@ export class EventHubSender extends ClientEntity {
         let onModified: Func<rheaPromise.Context, void>;
         let onAccepted: Func<rheaPromise.Context, void>;
         const removeListeners = (): void => {
-          this._sender.removeListener("rejected", onRejected);
-          this._sender.removeListener("accepted", onAccepted);
-          this._sender.removeListener("released", onReleased);
-          this._sender.removeListener("modified", onModified);
+          debug("**********[%s] Sender '%s', removing listeners", this._context.connectionId, this.name);
+          this._sender.removeAllListeners("rejected");
+          this._sender.removeAllListeners("accepted");
+          this._sender.removeAllListeners("released");
+          this._sender.removeAllListeners("modified");
         };
 
         onAccepted = (context: rheaPromise.Context) => {
@@ -227,6 +228,7 @@ export class EventHubSender extends ClientEntity {
           }
           reject(err);
         };
+        debug("**********[%s] Sender '%s', adding listeners", this._context.connectionId, this.name);
         this._sender.on("accepted", onAccepted);
         this._sender.on("rejected", onRejected);
         this._sender.on("modified", onModified);
@@ -279,6 +281,7 @@ export class EventHubSender extends ClientEntity {
         debug("[%s] Trying to create sender '%s'...", this._context.connectionId, this.name);
         const options = this._createSenderOptions();
         this._sender = await rheaPromise.createSenderWithHandlers(this._session, onAmqpError, options);
+        this._sender.setMaxListeners(1000);
         debug("[%s] Promise to create the sender resolved. Created sender with name: %s",
           this._context.connectionId, this.name);
         debug("[%s] Sender '%s' created with sender options: %O",
