@@ -48,6 +48,7 @@ export class EventHubSender extends ClientEntity {
   /**
    * Sends the given message, with the given options on this link
    *
+   * @method send
    * @param {any} data Message to send.  Will be sent as UTF8-encoded JSON string.
    * @returns {Promise<rheaPromise.Delivery>} Promise<rheaPromise.Delivery>
    */
@@ -91,15 +92,15 @@ export class EventHubSender extends ClientEntity {
       }
       debug("[%s] Sender '%s', trying to send EventData[]: %O",
         this._context.connectionId, this.name, datas);
-      const messages: rhea.Message[] = [];
-      // Convert EventData to AmqpMessage.
+      const messages: rheaPromise.Message[] = [];
+      // Convert EventData to rheaPromise.Message.
       for (let i = 0; i < datas.length; i++) {
         const message = EventData.toAmqpMessage(datas[i]);
         message.body = this._context.dataTransformer.encode(datas[i].body);
         messages[i] = message;
       }
       // Encode every amqp message and then convert every encoded message to amqp data section
-      const batchMessage: rhea.Message = {
+      const batchMessage: rheaPromise.Message = {
         body: rhea.message.data_sections(messages.map(rhea.message.encode))
       };
       // Set message_annotations, application_properties and properties of the first message as
@@ -130,6 +131,7 @@ export class EventHubSender extends ClientEntity {
   /**
    * "Unlink" this sender, closing the link and resolving when that operation is complete.
    * Leaves the underlying connection open.
+   * @method close
    * @return {Promise<void>} Promise<void>
    */
   async close(): Promise<void> {
@@ -139,9 +141,6 @@ export class EventHubSender extends ClientEntity {
         delete this._context.senders[this.name!];
         debug("[%s] Deleted the sender '%s' with address '%s' from the client cache.",
           this._context.connectionId, this.name, this.address);
-        if (this._sender) {
-            this._sender.removeAllListeners();
-        }
         this._sender = undefined;
         this._session = undefined;
         clearTimeout(this._tokenRenewalTimer as NodeJS.Timer);
@@ -174,7 +173,7 @@ export class EventHubSender extends ClientEntity {
    * @param message The message to be sent to EventHub.
    * @return {Promise<rheaPromise.Delivery>} Promise<rheaPromise.Delivery>
    */
-  private _trySend(message: rhea.Message, tag?: any, format?: number): Promise<rheaPromise.Delivery> {
+  private _trySend(message: rheaPromise.Message, tag?: any, format?: number): Promise<rheaPromise.Delivery> {
     const sendEventPromise = new Promise<rheaPromise.Delivery>((resolve, reject) => {
       debug("[%s] Sender '%s', credit: %d available: %d", this._context.connectionId, this.name,
         this._sender.credit, this._sender.session.outgoing.available());
@@ -206,6 +205,7 @@ export class EventHubSender extends ClientEntity {
         };
         onReleased = (context: rheaPromise.EventContext) => {
           removeListeners();
+          debug("[%s] Sender '%s', got event released.", this._context.connectionId, this.name);
           let err: Error;
           if (context!.delivery!.remote_state!.error) {
             err = translate(context!.delivery!.remote_state!.error);
@@ -217,6 +217,7 @@ export class EventHubSender extends ClientEntity {
         };
         onModified = (context: rheaPromise.EventContext) => {
           removeListeners();
+          debug("[%s] Sender '%s', got event modified.", this._context.connectionId, this.name);
           let err: Error;
           if (context!.delivery!.remote_state!.error) {
             err = translate(context!.delivery!.remote_state!.error);
@@ -226,7 +227,6 @@ export class EventHubSender extends ClientEntity {
           }
           reject(err);
         };
-        removeListeners();
         this._sender.on("accepted", onAccepted);
         this._sender.on("rejected", onRejected);
         this._sender.on("modified", onModified);
@@ -270,7 +270,7 @@ export class EventHubSender extends ClientEntity {
       if (!this._isOpen()) {
         await this._negotiateClaim();
         const onAmqpError = (context: rheaPromise.EventContext) => {
-          const senderError = translate(context.sender!.error!);
+          const senderError = translate(context!.sender!.error || new Error('Undefined error'));
           // TODO: Should we retry before calling user's error method?
           debug("[%s] An error occurred for sender '%s': %O.",
             this._context.connectionId, this.name, senderError);
@@ -278,12 +278,8 @@ export class EventHubSender extends ClientEntity {
         this._session = await rheaPromise.createSession(this._context.connection);
         debug("[%s] Trying to create sender '%s'...", this._context.connectionId, this.name);
         const options = this._createSenderOptions();
-
-        if (this._sender) {
-          this._sender.removeAllListeners();
-        }
-
         this._sender = await rheaPromise.createSenderWithHandlers(this._session, onAmqpError, options);
+        this._sender.setMaxListeners(1000);
         debug("[%s] Promise to create the sender resolved. Created sender with name: %s",
           this._context.connectionId, this.name);
         debug("[%s] Sender '%s' created with sender options: %O",
